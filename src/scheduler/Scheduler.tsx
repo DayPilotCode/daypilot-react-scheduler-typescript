@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { DayPilot, DayPilotScheduler } from "@daypilot/daypilot-lite-react";
 
 const Scheduler: React.FC = () => {
-    const schedulerRef = useRef<DayPilotScheduler>(null);
+    const [scheduler, setScheduler] = useState<DayPilot.Scheduler>();
 
     const [resources, setResources] = useState<DayPilot.ResourceData[]>([]);
     const [events, setEvents] = useState<DayPilot.EventData[]>([]);
@@ -16,25 +16,40 @@ const Scheduler: React.FC = () => {
         console.log("Event resized: ", args);
     };
 
+    const onBeforeEventRender = (args: DayPilot.SchedulerBeforeEventRenderArgs) => {
+        args.data.areas = [
+            {
+                top: 14,
+                right: 4,
+                width: 20,
+                height: 20,
+                symbol: "/icons/daypilot.svg#trash",
+                fontColor: "#999999",
+                onClick: args => {
+                    const e = args.source;
+                    scheduler?.events.remove(e);
+                }
+            }
+        ];
+    }
+
     const onTimeRangeSelected = async (args: DayPilot.SchedulerTimeRangeSelectedArgs) => {
-        const dp = schedulerRef.current!.control;
         const modal = await DayPilot.Modal.prompt("New reservation:", "Reservation");
-        dp.clearSelection();
+        scheduler?.clearSelection();
         if (modal.canceled) {
             return;
         }
-        schedulerRef.current?.control.events.add({ id: DayPilot.guid(), text: modal.result!, start: args.start, end: args.end, resource: args.resource });
+        scheduler?.events.add({ id: DayPilot.guid(), text: modal.result!, start: args.start, end: args.end, resource: args.resource });
     };
 
     const onEventClicked = async (args: DayPilot.SchedulerEventClickedArgs) => {
-        const dp = schedulerRef.current!.control;
         const modal = await DayPilot.Modal.prompt("Edit reservation:", args.e.data.text);
-        dp.clearSelection();
+        scheduler?.clearSelection();
         if (modal.canceled) {
             return;
         }
         args.e.data.text = modal.result;
-        schedulerRef.current!.control.events.update(args.e);
+        scheduler?.events.update(args.e);
     };
 
     // Load resources/events + initial scroll
@@ -83,13 +98,13 @@ const Scheduler: React.FC = () => {
             },
         ]);
 
-        schedulerRef.current?.control.scrollTo("2026-11-01");
-    }, []);
+        scheduler?.scrollTo("2026-11-01");
+    }, [scheduler]);
 
     return (
         <div>
             <DayPilotScheduler
-                ref={schedulerRef}
+                controlRef={setScheduler}
                 startDate={startDate}
                 days={startDate.daysInYear()}
                 scale={"Day"}
@@ -99,12 +114,15 @@ const Scheduler: React.FC = () => {
                     { groupBy: "Day", format: "d" },
                 ]}
                 cellWidth={50}
+                rowMarginTop={2}
+                rowMarginBottom={2}
                 resources={resources}
                 events={events}
                 onEventMoved={onEventMoved}
                 onEventResized={onEventResized}
                 onTimeRangeSelected={onTimeRangeSelected}
                 onEventClicked={onEventClicked}
+                onBeforeEventRender={onBeforeEventRender}
             />
         </div>
     );
